@@ -1,6 +1,5 @@
 import asyncio
 import sqlite3
-import threading
 import os
 from datetime import datetime
 from flask import Flask, request
@@ -9,7 +8,6 @@ from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.types import ReplyKeyboardRemove, InlineKeyboardMarkup, InlineKeyboardButton
-from aiogram.types import Update
 
 from config import BOT_TOKEN, ADMIN_IDS
 from database import init_db, add_log
@@ -64,13 +62,7 @@ def get_pending_users():
 def health():
     return "OK", 200
 
-@flask_app.route(f'/webhook/{BOT_TOKEN}', methods=['POST'])
-async def webhook():
-    update = types.Update(**await request.get_json())
-    await dp.feed_update(bot, update)
-    return "OK", 200
-
-# ========== СТАРТ ==========
+# ========== ОБРАБОТЧИКИ БОТА ==========
 @dp.message(Command("start"))
 async def cmd_start(message: types.Message):
     user = get_user(message.from_user.id)
@@ -104,7 +96,6 @@ async def role_selected(message: types.Message):
     
     await message.answer("✅ Заявка отправлена админу!", reply_markup=ReplyKeyboardRemove())
 
-# ========== АДМИН: ЗАЯВКИ ==========
 @dp.message(F.text == "👥 Заявки")
 async def pending_users(message: types.Message):
     if message.from_user.id not in ADMIN_IDS:
@@ -140,7 +131,6 @@ async def reject_user(callback: types.CallbackQuery):
     await bot.send_message(user_id, "❌ Заявка отклонена")
     await callback.answer()
 
-# ========== СКАУТ ==========
 @dp.message(F.text == "➕ Добавить канал")
 async def add_channel(message: types.Message, state: FSMContext):
     user = get_user(message.from_user.id)
@@ -234,7 +224,6 @@ async def my_channels(message: types.Message):
         text += f"• {ch['topic']} | {ch['price']}₽ | {status}\n"
     await message.answer(text)
 
-# ========== ПРОФИЛЬ ==========
 @dp.message(F.text == "👤 Профиль")
 async def profile(message: types.Message):
     user = get_user(message.from_user.id)
@@ -249,25 +238,20 @@ async def profile(message: types.Message):
     conn.close()
     await message.answer(text)
 
-# ========== ЗАПУСК ВЕБ-СЕРВЕРА ==========
-def start_bot():
-    """Запускает бота в отдельном потоке"""
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    
-    async def run():
-        await bot.delete_webhook()
-        await dp.start_polling(bot)
-    
-    loop.run_until_complete(run())
+# ========== ЗАПУСК ==========
+async def start_bot():
+    """Запускает бота"""
+    await bot.delete_webhook()
+    await dp.start_polling(bot)
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     init_db()
     
-    # Запускаем бота в отдельном потоке
-    bot_thread = threading.Thread(target=start_bot, daemon=True)
-    bot_thread.start()
+    # Запускаем бота в фоне
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    loop.create_task(start_bot())
     
-    # Запускаем Flask сервер
+    # Запускаем Flask сервер в основном потоке
     port = int(os.environ.get('PORT', 10000))
     flask_app.run(host='0.0.0.0', port=port)
