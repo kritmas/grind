@@ -8,7 +8,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.storage.memory import MemoryStorage
 
 BOT_TOKEN = "8090432779:AAGB8fTSo3gvs8REan1aWR6SKmrZjsUHDGU"
-ADMIN_IDS = [1664400109]
+ADMIN_IDS = [8083118398]
 
 bot = Bot(token=BOT_TOKEN)
 storage = MemoryStorage()
